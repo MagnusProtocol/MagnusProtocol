@@ -10,10 +10,10 @@
 \maketitle
 
 \begin{abstract}
-This paper describes an algorithm for transferring files between two computers.
+This paper describes a file exchange protocol for transferring files between two computers.
 We assume that the two computers are connected to each other by the internet (IPv4)
-with no apparent packet loss. The algorithm, in it's current state, is basic in nature
-and easy to understand. The algorithm is explained later in the paper.
+with no apparent packet loss. The protocol, in it's current state, is basic in nature
+and easy to understand. The protocol is explained later in the paper.
 \end{abstract}
 
 \section{The problem}
@@ -42,6 +42,45 @@ secure and end-to-end encrypt every single transfer and verify every single
 part sent over by comparing their hashes. \\
 
 \section{The way it works}
+
+Please keep in mind that Magnus is still pre-alpha.
+Everything written here is subject to change at any point in time. \\
+
+
+Consider two computers (A and B) connected to each other via the internet (IPv4)
+and have the required ports, whatever they might be, opened to the internet. Let's
+say that computer A wants to send a file, let's say image.jpg over to computer B using Magnus. \\
+
+
+To proceed with this, computer A will need to have read access to ``image.jpg'' and
+computer B will need to have write access to the filesystem. Both computers will need
+to have a Magnus instance running, and know their public IP addresses. \\
+
+
+When all of these requirements are met, the following sequence of actions will take place:
+\begin{enumerate}
+  \item When a transfer is initiated, a TCP socket connection will be opened between
+        computer A and B.
+  \item Both computers will gererate new private/public keypairs using ECDH
+        (Elliptic Curve Diffie-Hellman) and send each other their public keys over
+        the TCP connection opened earlier. After the keys have been exchanged, both
+        computers will generate shared keys using the Diffie-Hellman key exchange method.
+  \item Computer A will now read the file from the disk and load it into
+        memory by mapping it in memory. If the file is too big to be mapped at
+        once, it will be divided into parts and those parts will go through the same process.
+  \item Once in memory, the file will be hashed (ideally, using the BLAKE3 hashing algorithm)
+        and encrypted (ideally, using a secure AES256 implementation).
+  \item The file, now encrypted, will be compressed (ideally, using ZSTD) to reduce overall data usage.
+  \item The compressed data will now be cut into X non-overlapping parts of Y sizes where
+        X and Y will be determined by the ideal packet size function which is explained later in this paper.
+  \item Now, a UDP connection will be established between both the computers and the file will be sent
+        over it. This process is the key part of what makes Magnus special and is also explained later
+        in the paper.
+  \item Once computer B has ensured that all the parts have reached the destination, it will send back a
+        message to computer A, condluding the transfer.
+
+\end{enumerate}
+
 
 \section{``It's in the way that you use it''}
 If implemented correctly, Magnus has the potential of being a great tool, but
