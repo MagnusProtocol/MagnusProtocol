@@ -1,0 +1,59 @@
+\documentclass{article}
+
+\title{The Magnus Protocol}
+\author{SteveGremory}
+
+\usepackage{helvet}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This paper describes an algorithm for transferring files between two computers.
+We assume that the two computers are connected to each other by the internet (IPv4)
+with no apparent packet loss. The algorithm, in it's current state, is basic in nature
+and easy to understand. The algorithm is explained later in the paper.
+\end{abstract}
+
+\section{The problem}
+
+Today, if two people need to exchange a file with each other, they
+need to go through useless hassles like uploading it to a random website
+which they do not trust/should not trust or uploading it to some paid cloud
+provider's platform. \\
+
+
+People don't really have much of a choice, it's either trusting
+someone seemingly random individual or company with your data and in some
+cases, paying for the service to get larger upload sizes. If not this, then they
+are probably going to use some CLI application that may be hard to operate for
+regular GUI users. \\
+
+
+This is the problem Magnus aims to solve. Magnus' only forseeable goal is to make
+file transfer between two computers over the internet fast, efficeint and easy. \\
+
+
+Magnus also aims to make use of UDP to make the file trasfers faster than
+traditional TCP file transfers and have a well designed, simple and fast GUI
+for Linux and macOS (with Windows support soon to come). It also aims to be
+secure and end-to-end encrypt every single transfer and verify every single
+part sent over by comparing their hashes. \\
+
+\section{The way it works}
+
+\section{``It's in the way that you use it''}
+If implemented correctly, Magnus has the potential of being a great tool, but
+ultimately, it will always be up to the user to decide what to do with it. \\
+
+We value privacy more than anything (even speed), making it none of our (the developers')
+or anyone elses' business what you use it for; however, we sill suggest that
+you to not use Magnus for anything immoral. \\
+
+The software is licenced under GPLv3 and whatever the user does with it
+is their responsibility. The developers take no responsibility over how
+the software is being used and are not concerned with it either as long
+as the GPL licence isn't being violated.
+
+\end{document}
