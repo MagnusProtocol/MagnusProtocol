@@ -10,32 +10,30 @@
 \maketitle
 
 \begin{abstract}
-This paper describes a file exchange protocol for transferring files between two computers.
-We assume that the two computers are connected to each other by the internet (IPv4)
-with no apparent packet loss. The protocol, in it's current state, is basic in nature
-and easy to understand. The protocol is explained later in the paper.
+      This paper describes a file exchange protocol for transferring files between two computers.
+      We assume that the two computers are connected to each other by the internet (IPv4)
+      with no apparent packet loss. The protocol, in it's current state, is basic in nature
+      and easy to understand. The protocol is explained later in the paper.
 \end{abstract}
 
 \section{The problem}
 
-Today, if two people need to exchange a file with each other, they
-need to go through useless hassles like uploading it to a random website
-which they do not trust/should not trust or uploading it to some paid cloud
-provider's platform. \\
+Today, if two people need to exchange a file with each other, they need to go
+through useless hassles like uploading it to a random website which they do not
+trust/should not trust or uploading it to some paid cloud provider's platform.
+\\
 
+People don't really have much of a choice, it's either trusting someone
+seemingly random individual or company with your data and in some cases, paying
+for the service to get larger upload sizes. If not this, then they are probably
+going to use some CLI application that may be hard to operate for regular GUI
+users. \\
 
-People don't really have much of a choice, it's either trusting
-someone seemingly random individual or company with your data and in some
-cases, paying for the service to get larger upload sizes. If not this, then they
-are probably going to use some CLI application that may be hard to operate for
-regular GUI users. \\
+This is the problem Magnus aims to solve. Magnus' only forseeable goal is to
+make file transfer between two computers over the internet fast, efficient and
+easy. \\
 
-
-This is the problem Magnus aims to solve. Magnus' only forseeable goal is to make
-file transfer between two computers over the internet fast, efficeint and easy. \\
-
-
-Magnus also aims to make use of UDP to make the file trasfers faster than
+Magnus also aims to make use of UDP to make the file transfers faster than
 traditional TCP file transfers and have a well designed, simple and fast GUI
 for Linux and macOS (with Windows support soon to come). It also aims to be
 secure and end-to-end encrypt every single transfer and verify every single
@@ -43,56 +41,88 @@ part sent over by comparing their hashes. \\
 
 \section{The way it works}
 
-Please keep in mind that Magnus is still pre-alpha.
-Everything written here is subject to change at any point in time. \\
+Please keep in mind that Magnus is still pre-alpha. Everything written here is
+subject to change at any point in time. \\
 
+Consider two computers (A and B) connected to each other via the internet
+(IPv4) and have the required ports, whatever they might be, opened to the
+internet. Let's say that computer A wants to send a file, let's say image.jpg
+over to computer B using Magnus. \\
 
-Consider two computers (A and B) connected to each other via the internet (IPv4)
-and have the required ports, whatever they might be, opened to the internet. Let's
-say that computer A wants to send a file, let's say image.jpg over to computer B using Magnus. \\
+To proceed with this, computer A will need to have read access to ``image.jpg''
+and computer B will need to have write access to the filesystem. Both computers
+will need to have a Magnus instance running, and know their public IP
+addresses. \\
 
-
-To proceed with this, computer A will need to have read access to ``image.jpg'' and
-computer B will need to have write access to the filesystem. Both computers will need
-to have a Magnus instance running, and know their public IP addresses. \\
-
-
-When all of these requirements are met, the following sequence of actions will take place:
+When all of these requirements are met, the following sequence of actions will
+take place:
 \begin{enumerate}
-  \item When a transfer is initiated, a TCP socket connection will be opened between
-        computer A and B.
-  \item Both computers will gererate new private/public keypairs using ECDH
-        (Elliptic Curve Diffie-Hellman) and send each other their public keys over
-        the TCP connection opened earlier. After the keys have been exchanged, both
-        computers will generate shared keys using the Diffie-Hellman key exchange method.
-  \item Computer A will now read the file from the disk and load it into
-        memory by mapping it in memory. If the file is too big to be mapped at
-        once, it will be divided into parts and those parts will go through the same process.
-  \item Once in memory, the file will be hashed (ideally, using the BLAKE3 hashing algorithm)
-        and encrypted (ideally, using a secure AES256 implementation).
-  \item The file, now encrypted, will be compressed (ideally, using ZSTD) to reduce overall data usage.
-  \item The compressed data will now be cut into X non-overlapping parts of Y sizes where
-        X and Y will be determined by the ideal packet size function which is explained later in this paper.
-  \item Now, a UDP connection will be established between both the computers and the file will be sent
-        over it. This process is the key part of what makes Magnus special and is also explained later
-        in the paper.
-  \item Once computer B has ensured that all the parts have reached the destination, it will send back a
-        message to computer A, condluding the transfer.
-
+      \item When a transfer is initiated, a TCP socket connection will be opened between
+            computer A and B.
+      \item Both computers will generate new private/public key-pairs using ECDH (Elliptic
+            Curve Diffie-Hellman) and send each other their public keys over the TCP
+            connection opened earlier. After the keys have been exchanged, both computers
+            will generate shared keys using the aforementioned.
+      \item Computer A will now read the file from the disk and load it into memory by
+            streaming it from disk. As each part is read from the disk, it will be put in a
+            queue to be sent over to computer B. The size of each packet read from the disk
+            and the queue shall be implementation dependant.
+      \item As the previous task is being carried out by the main thread, another thread
+            will be consuming the queue and
+            \textbf{labelling/hashing/encrypting/compressing} the parts and eventually
+            writing all the information to a csv file. This will include: the size of the
+            packet, it's hash, it's label number and the data, where data can be a pointer
+            to the data in memory or some of the data itself. Ideally, all of these
+            processes should be delegated to different threads.
+      \item The label and the size of the packet will be added at the top of each packet
+            alongside other header information.
+      \item Now, the csv file mentioned in the last step will be sent over the TCP
+            connection and a UDP connection will be established between both the computers
+            to facilitate the transfer of the actual data. This is where Magnus stands out,
+            the transfer process will be explained in the next section of the paper.
+      \item Once computer B has ensured that all the parts have reached the destination, it
+            will send back a message to computer A, concluding the transfer.
 \end{enumerate}
 
+\section{The UDP Transfer}
+The UDP transfer is what makes Mangus different from other widely available
+protocols. It isn't being claimed that this hasn't been done before and no
+research was conducted by the authors regarding this topic. \\
+
+Here's how it works in a nutshell, implementations may modify this process to
+suit their needs:
+\begin{enumerate}
+      \item First, all the parts are sent over the UDP socket one by one.
+      \item As the receiver gets each part, it looks at the part's header and matches it
+            with the information contained in the CSV that was sent over TCP before the
+            actual data packet transfer began. In the worst case, the client will keep
+            waiting for the file to fully arrive until the transfer ends.
+      \item As soon as a file matching the size and the header is completely received, it
+            will be hashed and it's hash will be compared to the hash sent by the sender.
+            If the hash matches, the file packet will be written to disk. If not, it's
+            label, size and hash will be stored in memory/written to a file on disk for
+            later use which will be elaborated in the points to come.
+      \item The client will have to do this in a non-blocking fashion, this will be
+            implementation dependant.
+      \item Once the first round of packets have been sent, the sender will send an
+            acknowledgement to the client suggesting that all the packets have been sent at
+            least once.
+      \item Now, if any packets didn't match up, the client will request receiver to send
+            over those packets again and this process will recursively continue until all
+            the packets have been received.
+\end{enumerate}
 
 \section{``It's in the way that you use it''}
 If implemented correctly, Magnus has the potential of being a great tool, but
 ultimately, it will always be up to the user to decide what to do with it. \\
 
-We value privacy more than anything (even speed), making it none of our (the developers')
-or anyone elses' business what you use it for; however, we sill suggest that
-you to not use Magnus for anything immoral. \\
+We value privacy more than anything (even speed), making it none of our (the
+developers') or anyone elses' business what you use it for; however, we sill
+suggest that you to not use Magnus for anything immoral. \\
 
-The software is licenced under GPLv3 and whatever the user does with it
-is their responsibility. The developers take no responsibility over how
-the software is being used and are not concerned with it either as long
-as the GPL licence isn't being violated.
+The software is licensed under GPLv3 and whatever the user does with it is
+their responsibility. The developers take no responsibility over how the
+software is being used and are not concerned with it either as long as the GPL
+license isn't being violated.
 
 \end{document}
